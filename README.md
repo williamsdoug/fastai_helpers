@@ -28,6 +28,29 @@
   - note: Includes version of MISH with application (mish source: https://github.com/lessw2020/mish)
 
 
+#### interpret.py
+- analyze_interp()
+  - Summary results for nterpreter including plots
+- combine_predictions()
+  - Generates composite prediction based on multiple interpreters
+- plot_confusion_matrix()
+  - plots confusion matrix with clean-up of distplay boundaries
+- plot_confusion_matrix_thresh()
+  - plots confusion matrix after thresholding values
+  - threshold_confusion_matrix(): computes confusion matric using threshold
+- interpretation_summary()
+  - Outputs various stats (summary, cm, threshold analysis)
+- get_accuracy()
+  - Computes accuract stat for interpreter
+- analyze_confidence()
+  - Plots confidence histograms
+- accuracy_vs_threshold()
+  - Plots accuract vs threshold value
+- show_incremental_accuracy()
+  - TBS
+- analyze_low_confidence()
+  - TBS
+
 #### other_helpers.py
 - verify_gpu()
   - checks GPU status
@@ -37,23 +60,5 @@
 ### Files requiring reorganization
 
 #### helpers.py
-- Interpreter:
-  - _get_interp()
-  - analyze_interp()
-  - compute_acc()
-  - combine_predictions()
-
-
-#### fastai_addons.py
-- plot_confusion_matrix()
-  - plots confusion matrix with clean-up of distplay boundaries
-- plot_confusion_matrix_thresh()
-  - plots confusion matrix after thresholding values
-  - threshold_confusion_matrix(): computes confusion matric using threshold
-- interpretation_summary()
-  - Outputs various stats (summary, cm, threshold analysis)
-- get_accuracy()
-- analyze_confidence()
-- accuracy_vs_threshold()
-- show_incremental_accuracy()
-- analyze_low_confidence()
+- _get_interp()
+  - ISSUE: Code may be too implementation specific

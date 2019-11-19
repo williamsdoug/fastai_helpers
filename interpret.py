@@ -6,15 +6,17 @@ from fastai.vision import *
 import matplotlib.pyplot as plt
 from typing import Optional
 import itertools
-
-
 import scipy
 from scipy.stats import gmean, hmean
 
 
-
-
-
+def analyze_interp(interp, include_norm=True):
+    interpretation_summary(interp)
+    plot_confusion_matrix(interp)
+    plt.show()
+    if include_norm:
+        plot_confusion_matrix(interp, normalize=True)
+        plt.show() 
 
 
 def threshold_confusion_matrix(interp, thresh=0):
@@ -314,17 +316,7 @@ def analyze_low_confidence(interp, thresh=0.0, thresh_min=0.0, display_mode='del
         print(f'    is_sec: {is_sec}   p_sec: {p_second:3.2f}   del_sec: {delta_second:3.2f}')       
 
 
-
-def analyze_interp(interp, include_norm=True):
-    interpretation_summary(interp)
-    plot_confusion_matrix(interp)
-    plt.show()
-    if include_norm:
-        plot_confusion_matrix(interp, normalize=True)
-        plt.show() 
-
-
-def compute_acc(preds, y_true):
+def _compute_acc(preds, y_true):
     yy = np.argmax(preds, axis=-1)
     return np.mean(yy==y_true)
     
@@ -334,16 +326,16 @@ def combine_predictions(all_interp):
     all_preds = np.stack([to_np(interp.preds) for _, interp in all_interp])
     
     preds = np.mean(all_preds, axis=0)
-    acc_m = compute_acc(preds, y_true) 
+    acc_m = _compute_acc(preds, y_true) 
     
     preds = np.median(all_preds, axis=0)
-    acc_med = compute_acc(preds, y_true)
+    acc_med = _compute_acc(preds, y_true)
     
     preds = gmean(all_preds, axis=0)
-    acc_g = compute_acc(preds, y_true)
+    acc_g = _compute_acc(preds, y_true)
     
     preds = hmean(all_preds, axis=0)
-    acc_h = compute_acc(preds, y_true)
+    acc_h = _compute_acc(preds, y_true)
     
     print(f'accuracy -- mean: {acc_m:0.3f}   median: {acc_med:0.3f}   gmean: {acc_g:0.3f}   hmean: {acc_h:0.3f}')
     return acc_m, acc_med, acc_g, acc_h
