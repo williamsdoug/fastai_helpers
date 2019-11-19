@@ -10,7 +10,7 @@ import scipy
 import itertools
 import fastai
 import torchvision
-
+from pprint import pprint
 
 
 # from fastai.vision import Learner
@@ -162,14 +162,14 @@ def _train(learn:Learner, n_epochs:int, lr:float=4e-3, start_pct:float=0.72,
     if key: key = f'{key}_c{n_epochs}_lr{lr}_'
     if use_fp16: learn.to_fp16()
 
+    if unfreeze:
+        if isinstance(unfreeze, bool):
+            if key: key = f'{key}_ufa'
+            learn.unfreeze()
+        elif isinstance(unfreeze, int):
+            if key: key = f'{key}_uf{unfreeze}' 
+            learn.freeze_to(unfreeze)
     
-    if isinstance(unfreeze, int):
-        if key: key = f'{key}_uf{unfreeze}' 
-        learn.freeze_to(unfreeze)
-    elif unfreeze:
-        if key: key = f'{key}_ufa'
-        learn.freeze()
-
     if mixup:
         if isinstance(mixup, float):
             if key: key = f'{key}_mu{mixup}'
@@ -210,7 +210,7 @@ def _train(learn:Learner, n_epochs:int, lr:float=4e-3, start_pct:float=0.72,
     if key and stats_repo:
         stats =  get_best_stats(learn, monitor_metric) 
         stats_repo.add([key, stats])
-        print('updated stats')
+        #print('updated stats', key, stats)
 
     if save_model and key:  
         learn.save(key)
@@ -233,7 +233,9 @@ def get_best_stats(learner, monitor_metric):
     for i, loss in enumerate(rec.val_losses):
         entry = [loss] + [float(v) for v in rec.metrics[i]]
         results.append(dict(zip(keys, entry)))
-    return sorted(results, key=lambda x:x[monitor_metric])[0]
+    #pprint(sorted(results, key=lambda x:x[monitor_metric]))
+    idx = -1 if 'acc' in monitor_metric else 0
+    return sorted(results, key=lambda x:x[monitor_metric])[idx]
 
 
 def get_val_stats(learner):
