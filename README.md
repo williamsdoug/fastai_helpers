@@ -13,7 +13,7 @@
 - lr_find()
   - lrfinder + plots
   - Learner.Recorder.plot2(): returns smoothed plot with suggestions
-- train()
+- _train()
   - supports both one-cycle and flat annealing
 - Learner.svalidate()
   - silently validate -- compute validation results without updating Jupyter cell output 

@@ -54,8 +54,8 @@ def model_cutter(model, select=[]):
             return nn.Sequential(*new_ll)
 
 
-def lr_find(learn, **kwargs):
-    learn.to_fp16()
+def lr_find(learn, use_fp16=True, **kwargs):
+    if use_fp16: learn.to_fp16()
     learn.lr_find(**kwargs)
     learn.recorder.plot()
     learn.recorder.plot2()
@@ -159,20 +159,16 @@ def _train(learn:Learner, n_epochs:int, lr:float=4e-3, start_pct:float=0.72,
           use_fp16=True, show_plots=True, save_model=True, use_fa=False, unfreeze=None,
           **kwargs):
 
-    if key:
-        if use_fa:
-            key = f'{key}_c{n_epochs}_lr{lr}_fa'
-        else:
-            key = f'{key}_c{n_epochs}_lr{lr}_oc'
-
+    if key: key = f'{key}_c{n_epochs}_lr{lr}_'
     if use_fp16: learn.to_fp16()
 
-    if unfreeze == 'all':
-        if key: key = f'{key}_ufa'
-        learn.freeze()
-    elif unfreeze:
+    
+    if isinstance(unfreeze, int):
         if key: key = f'{key}_uf{unfreeze}' 
         learn.freeze_to(unfreeze)
+    elif unfreeze:
+        if key: key = f'{key}_ufa'
+        learn.freeze()
 
     if mixup:
         if isinstance(mixup, float):
@@ -186,6 +182,12 @@ def _train(learn:Learner, n_epochs:int, lr:float=4e-3, start_pct:float=0.72,
         lr = slice(lr)
         if key: key = f'{key}_sl'
 
+    if key:
+        if use_fa:
+            key = f'{key}_fa'
+        else:
+            key = f'{key}_oc'
+
     if key: print(key)
 
     if key and stats_repo and stats_repo.exists(key):
@@ -197,7 +199,7 @@ def _train(learn:Learner, n_epochs:int, lr:float=4e-3, start_pct:float=0.72,
         sched = get_flat_anneal(learn, lr, n_epochs, start_pct)
         learn.fit(n_epochs, callbacks=[sched, save_cb], **kwargs)
     else:
-        learn.fit_one_cycle(cycles, callbacks=[save_cb], **kwargs)
+        learn.fit_one_cycle(n_epochs, callbacks=[save_cb], **kwargs)
 
     if show_plots:
         learn.recorder.plot_losses()
