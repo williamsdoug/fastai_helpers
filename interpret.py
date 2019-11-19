@@ -5,129 +5,16 @@ from fastai.torch_core import to_np
 from fastai.vision import *
 import matplotlib.pyplot as plt
 from typing import Optional
-import scipy
 import itertools
 
 
-def model_cutter(model, select=[]):
-    cut = select[0]
-    ll = list(model.children())
-    if len(select) == 1:
-        if cut == 0 and isinstance(ll[0], torch.nn.modules.container.Sequential):
-            return ll[0]
-        else:
-            return nn.Sequential(*ll[:cut+1])
-    else:
-        if cut == 0:
-            return model_cutter(ll[0], select=select[1:])
-        else:
-            new_ll = ll[:cut] +  [model_cutter(ll[cut], select=select[1:])]
-            return nn.Sequential(*new_ll)
+import scipy
+from scipy.stats import gmean, hmean
 
 
-def silent_validate(model:nn.Module, dl:DataLoader, loss_func:OptLossFunc=None, cb_handler:Optional[CallbackHandler]=None,
-             average=True, n_batch:Optional[int]=None)->Iterator[Tuple[Union[Tensor,int],...]]:
-    """Calculate `loss_func` of `model` on `dl` in evaluation mode.  
-       Note:  This version does not overwrite results from training"""
-    model.eval()
-    with torch.no_grad():
-        val_losses,nums = [],[]
-        if cb_handler: cb_handler.set_dl(dl)
-        for xb,yb in dl:
-            if cb_handler: xb, yb = cb_handler.on_batch_begin(xb, yb, train=False)
-            val_loss = loss_batch(model, xb, yb, loss_func, cb_handler=cb_handler)
-            val_losses.append(val_loss)
-            if not is_listy(yb): yb = [yb]
-            nums.append(first_el(yb).shape[0])
-            if cb_handler and cb_handler.on_batch_end(val_losses[-1]): break
-            if n_batch and (len(nums)>=n_batch): break
-        nums = np.array(nums, dtype=np.float32)
-        if average: return (to_np(torch.stack(val_losses)) * nums).sum() / nums.sum()
-        else:       return val_losses
 
 
-def _svalidate(self, dl=None, callbacks=None, metrics=None):
-        "Validate on `dl` with potential `callbacks` and `metrics`."
-        dl = ifnone(dl, self.data.valid_dl)
-        metrics = ifnone(metrics, self.metrics)
-        cb_handler = CallbackHandler(self.callbacks + ifnone(callbacks, []), metrics)
-        cb_handler.on_train_begin(1, None, metrics); cb_handler.on_epoch_begin()
-        val_metrics = silent_validate(self.model, dl, self.loss_func, cb_handler)
-        cb_handler.on_epoch_end(val_metrics)
-        return cb_handler.state_dict['last_metrics']
-    
-Learner.svalidate = _svalidate
 
-def get_val_stats(learner):
-    rec = learner.recorder
-    ret = {'loss':float(rec.val_losses[-1])}
-    for i, name in enumerate(rec.metrics_names):
-        ret[name] = float(rec.metrics[-1][i])
-    return ret
-
-
-def get_best_stats(learner):
-    rec = learner.recorder
-    keys = ['loss'] + rec.metrics_names
-    results = []
-    for i, loss in enumerate(rec.val_losses):
-        entry = [loss] + [float(v) for v in rec.metrics[i]]
-        results.append(dict(zip(keys, entry)))
-    return sorted(results, key=lambda x:x['error_rate'])[0]
-
-
-def my_smooth(sig, w=2):
-    sig_p = np.pad(sig, (w,w), 'edge')
-    return np.array([np.mean(sig_p[i:i+2*w+1]) for i in range(len(sig_p)-2*w)])
-
-
-def plot2(self, skip_start:int=10, skip_end:int=5, suggestion:bool=True, return_fig:bool=None, win=3,
-         **kwargs)->Optional[plt.Figure]:
-    "Plot learning rate and losses, trimmed between `skip_start` and `skip_end`. Optionally plot and return min gradient"
-    lrs = self._split_list(self.lrs, skip_start, skip_end)
-    losses = self._split_list(self.losses, skip_start, skip_end)
-    losses = [x.item() for x in losses]
-    all_losses = [losses]
-    
-    #if 'k' in kwargs: losses = self.smoothen_by_spline(lrs, losses, **kwargs)
-    fig, ax = plt.subplots(1,1)
-    ax.plot(lrs, losses)
-    
-    if win is not None: 
-        losses2 = my_smooth(losses, w=win)
-        all_losses.append(losses2)
-        ax.plot(lrs, losses2, 'g', lw=0.5)
-    
-    ax.set_ylabel("Loss")
-    ax.set_xlabel("Learning Rate")
-    ax.set_xscale('log')
-    ax.xaxis.set_major_formatter(plt.FormatStrFormatter('%.0e'))
-    if suggestion:
-        for i, l in enumerate(all_losses):
-            tag = '' if i == 0 else ' (smoothed)'
-            try: mg = (np.gradient(np.array(l))).argmin()
-            except:
-                print(f"Failed to compute the gradients{tag}, there might not be enough points.")
-                return
-            print(f"Min numerical gradient: {lrs[mg]:.2E} {tag}")
-            color = 'r' if i == 0 else 'g'
-            ax.plot(lrs[mg],losses[mg],markersize=10,marker='o',color=color)
-            if i == 0: 
-                self.min_grad_lr = lrs[mg]
-                ml = np.argmin(l)
-                ax.plot(lrs[ml],losses[ml],markersize=8,marker='o',color='k')
-                print(f"Min loss divided by 10: {lrs[ml]/10:.2E}")
-                ax.plot([lrs[ml]/10, lrs[ml]/10], [np.min(l), np.max(l)], 'k--', alpha=0.5)
-                #print(np.min(l), np.max(l))
-            elif i == 1:
-                self.min_grad_lr_smoothed = lrs[mg]
-        
-    if ifnone(return_fig, defaults.return_fig): return fig
-    try:
-        if not IN_NOTEBOOK: plot_sixel(fig)
-    except: pass
-        
-Recorder.plot2 = plot2
 
 
 def threshold_confusion_matrix(interp, thresh=0):
@@ -425,3 +312,39 @@ def analyze_low_confidence(interp, thresh=0.0, thresh_min=0.0, display_mode='del
         print(f'{j:4d}:   p_pred: {p_predict:3.2f}   p_corr: {p_correct:3.2f}    del_act: {delta_actual:3.2f}',end = '')
     
         print(f'    is_sec: {is_sec}   p_sec: {p_second:3.2f}   del_sec: {delta_second:3.2f}')       
+
+
+
+def analyze_interp(interp, include_norm=True):
+    interpretation_summary(interp)
+    plot_confusion_matrix(interp)
+    plt.show()
+    if include_norm:
+        plot_confusion_matrix(interp, normalize=True)
+        plt.show() 
+
+
+def compute_acc(preds, y_true):
+    yy = np.argmax(preds, axis=-1)
+    return np.mean(yy==y_true)
+    
+
+def combine_predictions(all_interp):
+    y_true = to_np(all_interp[0][1].y_true)
+    all_preds = np.stack([to_np(interp.preds) for _, interp in all_interp])
+    
+    preds = np.mean(all_preds, axis=0)
+    acc_m = compute_acc(preds, y_true) 
+    
+    preds = np.median(all_preds, axis=0)
+    acc_med = compute_acc(preds, y_true)
+    
+    preds = gmean(all_preds, axis=0)
+    acc_g = compute_acc(preds, y_true)
+    
+    preds = hmean(all_preds, axis=0)
+    acc_h = compute_acc(preds, y_true)
+    
+    print(f'accuracy -- mean: {acc_m:0.3f}   median: {acc_med:0.3f}   gmean: {acc_g:0.3f}   hmean: {acc_h:0.3f}')
+    return acc_m, acc_med, acc_g, acc_h
+
